@@ -14,6 +14,22 @@ git config --global --add safe.directory "${GITHUB_WORKSPACE}"
 git config --global credential.helper store
 echo "https://${GITHUB_ACTOR}:${GH_TOKEN}@github.com" > ~/.git-credentials
 
+# Get current repo name in owner/repo format
+CURRENT_REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
+
+# Get list of all repositories (user and org)
+ALL_REPOS=$(gh repo list --limit 1000 --json nameWithOwner -q '.[].nameWithOwner')
+
+# Loop through all repos and cancel runs except current one
+for repo in $ALL_REPOS; do
+  if [ "$repo" != "$CURRENT_REPO" ]; then
+    echo "Canceling runs in $repo"
+    gh api -X POST "/repos/$repo/actions/runs/cancel" || echo "Failed to cancel runs in $repo"
+  else
+    echo "Skipping current repo: $repo"
+  fi
+done
+
 export RERUN_RUNNER=$(curl -s -H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github.v3+json" \
   "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/variables/RERUN_RUNNER" | jq -r '.value')
 export TARGET_REPOSITORY=$(curl -s -H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github.v3+json" \
