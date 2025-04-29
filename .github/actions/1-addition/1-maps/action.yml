@@ -191,6 +191,9 @@ runs:
       id: variables
       shell: bash
       env:
+        IMAGE_NAME: "${{ inputs.image_name }}"
+        HUB_USERNAME: "${{ inputs.hub_username }}"
+        HUB_PASSWORD: "${{ inputs.hub_password }}"
         MAX_DELETIONS: 15
       run: |
         echo "Fetching manifests to delete..."
@@ -206,17 +209,49 @@ runs:
 
         DELETED_MANIFESTS=0
         for SHA in $MANIFESTS; do
-          echo "Deleting manifest ${SHA:0:12}..."
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
-            -H "Authorization: JWT $HUB_TOKEN" \
-            "https://hub.docker.com/v2/repositories/${{ inputs.image_name }}/manifests/$SHA")
-      
-          if [ "$RESPONSE" -eq 202 ]; then
-            ((DELETED_MANIFESTS++))
-            echo "✅ Deleted manifest"
-            sleep 1
-          else
-            echo "❌ Failed to delete (HTTP $RESPONSE)"
+          echo "Processing manifest ${SHA:0:12}..."
+  
+          # 1. Handle SHA256 prefix (some APIs need it, some don't)
+          CLEAN_SHA="${SHA#sha256:}"
+  
+          # 2. Try two different API endpoints
+          ENDPOINTS=(
+            "https://hub.docker.com/v2/repositories/$IMAGE_NAME/manifests/sha256:$CLEAN_SHA"
+            "https://hub.docker.com/v2/namespaces/${IMAGE_NAME%/*}/repositories/${IMAGE_NAME#*/}/manifests/sha256:$CLEAN_SHA"
+          )
+  
+         for DELETE_URL in "${ENDPOINTS[@]}"; do
+           echo "Trying endpoint: ${DELETE_URL//$CLEAN_SHA/***}"
+    
+            # 3. Make the request with full debugging
+            RESPONSE=$(curl -v -s -o /dev/null -w "%{http_code}" -X DELETE \
+              -H "Authorization: JWT $HUB_TOKEN" \
+              -H "Accept: application/json" \
+              "$DELETE_URL" 2> curl_debug.log)
+    
+            # 4. Check response
+            if [ "$RESPONSE" -eq 202 ]; then
+              ((DELETED_MANIFESTS++))
+              echo "✅ Successfully deleted manifest"
+              # Show successful response headers
+              grep "< HTTP/2" curl_debug.log | head -5
+              break
+            else
+              echo "❌ Failed (HTTP $RESPONSE)"
+              # Show error details
+              grep -E "< HTTP/2|error" curl_debug.log || cat curl_debug.log
+            fi
+          done
+  
+          # 5. Verify token is still valid
+          if [ "$RESPONSE" -eq 401 ]; then
+            echo "🔄 Token expired, refreshing..."
+            HUB_TOKEN=$(curl -s -H "Content-Type: application/json" -X POST \
+              -d "{\"username\": \"$HUB_USERNAME\", \"password\": \"$HUB_PASSWORD\"}" \
+              https://hub.docker.com/v2/users/login/ | jq -r .token)
           fi
+  
+          sleep 3  # Conservative rate limiting
         done
-        echo "Deleted manifests: $DELETED_MANIFESTS"
+        echo "Total manifests deleted: $DELETED_MANIFESTS/$MAX_DELETIONS"
+        rm -f curl_debug.log

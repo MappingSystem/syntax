@@ -14,22 +14,6 @@ git config --global --add safe.directory "${GITHUB_WORKSPACE}"
 git config --global credential.helper store
 echo "https://${GITHUB_ACTOR}:${GH_TOKEN}@github.com" > ~/.git-credentials
 
-# Get current repo name in owner/repo format
-CURRENT_REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
-
-# Get list of all repositories (user and org)
-ALL_REPOS=$(gh repo list --limit 1000 --json nameWithOwner -q '.[].nameWithOwner')
-
-# Loop through all repos and cancel runs except current one
-for repo in $ALL_REPOS; do
-  if [ "$repo" != "$CURRENT_REPO" ]; then
-    echo "Canceling runs in $repo"
-    gh api -X POST "/repos/$repo/actions/runs/cancel" || echo "Failed to cancel runs in $repo"
-  else
-    echo "Skipping current repo: $repo"
-  fi
-done
-
 export RERUN_RUNNER=$(curl -s -H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github.v3+json" \
   "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/variables/RERUN_RUNNER" | jq -r '.value')
 export TARGET_REPOSITORY=$(curl -s -H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github.v3+json" \
@@ -70,7 +54,21 @@ if [[ -z ${PASS} ]] || [[ "${PASS}" == "true" ]]; then
     echo -e "\n$hr\nCONFIG\n$hr"
     mv -f /home/runner/work/_actions/eq19/eq19/v2/.github/templates/jekyll_config.yml $RUNNER_TEMP/_config.yml
     export PATH=/home/runner/work/_actions/eq19/eq19/v2/.github/entrypoint:$PATH && artifact.sh
-    
+
+    # Loop through all repos and cancel runs except current one
+    #ALL_REPOS=""
+    #ORGS=$(gh api user/orgs --jq '.[].login')
+    #CURRENT_REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
+    #ALL_REPOS+=$(gh repo list --limit 1000 --json nameWithOwner -q '.[].nameWithOwner')
+    #for org in $ORGS; do ALL_REPOS+=$(gh repo list $org --limit 1000 --json nameWithOwner -q '.[].nameWithOwner'); done
+    #for REPO in $ALL_REPOS; do
+      #if [ "$REPO" != "$CURRENT_REPO" ]; then
+        #RUNS=$(gh api "repos/$REPO/actions/runs?status=in_progress" --jq '.workflow_runs[].id')
+        #RUNS+=" $(gh api "repos/$REPO/actions/runs?status=queued" --jq '.workflow_runs[].id')"
+        #for RUN_ID in $RUNS; do gh api -X POST "repos/$REPO/actions/runs/$RUN_ID/force-cancel"; done
+      #fi
+    #done
+
     PARAMS_JSON=$(curl -s -H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github.v3+json" \
       "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/variables/PARAMS_JSON" | jq -r '.value')
     echo "${PARAMS_JSON}" | jq '.' > $1/user_data/strategies/fibbo.json
@@ -111,6 +109,11 @@ if [[ "${JOBS_ID}" == "1" ]]; then
 
     cd $1 && javac -d user_data/ft_client/test_client javaCode/Main.java
     cd $GITHUB_WORKSPACE && rm -rf user_data && mv -f $1/user_data . && ls -al .
+
+    # Fetch SHA, encode new content, and update in one step
+    gh api --method PUT /repos/${TARGET_REPOSITORY}/contents/.github/workflows/main.yml \
+      -f sha="$(gh api /repos/${TARGET_REPOSITORY}/contents/.github/workflows/main.yml --jq '.sha')" \
+      -f message="Update file" -f content="$(base64 -w0 .github/workflows/main.yml)" > /dev/null
 
   fi
 

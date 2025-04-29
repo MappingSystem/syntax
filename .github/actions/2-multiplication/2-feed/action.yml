@@ -133,7 +133,7 @@ runs:
             [Service]
             Type=oneshot
             RemainAfterExit=true
-            ExecStart=/sbin/iptables -A INPUT -p tcp --match multiport --dports 80,5432,6379 -j ACCEPT
+            ExecStart=/sbin/iptables -A INPUT -p tcp --match multiport --dports 80,5432,6379,8080 -j ACCEPT
 
         - path: /etc/systemd/system/runner1.service
           permissions: "0644"

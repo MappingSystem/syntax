@@ -123,11 +123,6 @@ jekyll_build() {
 
   fi
    
-  # Fetch SHA, encode new content, and update in one step
-  gh api --method PUT /repos/${TARGET_REPOSITORY}/contents/.github/workflows/main.yml \
-    -f sha="$(gh api /repos/${TARGET_REPOSITORY}/contents/.github/workflows/main.yml --jq '.sha')" \
-    -f message="Update file" -f content="$(base64 -w0 .github/workflows/main.yml)" > /dev/null
-
 }
 
 # Define the next repository function using jq
