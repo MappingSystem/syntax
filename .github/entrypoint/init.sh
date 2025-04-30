@@ -75,6 +75,7 @@ if [[ -z ${PASS} ]] || [[ "${PASS}" == "true" ]]; then
     if jq empty < $1/user_data/strategies/fibbo.json; then
       echo -e "\n$hr\nPARAMETERS\n$hr"
       cat $1/user_data/strategies/fibbo.json
+      gh variable set PARAMS_JSON --repo ${TARGET_REPOSITORY} --body "${PARAMS_JSON}"
     else
       echo "Invalid JSON"
     fi
