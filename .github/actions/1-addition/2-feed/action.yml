@@ -93,27 +93,12 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: 💎 Set ID Token
-      id: 'auth'
-      uses: 'google-github-actions/auth@v2'
-      with:
-        token_format: 'id_token'
-        create_credentials_file: false
-        credentials_json: ${{ inputs.credentials }}
-        id_token_audience: 'https://us-central1-feedmapping.cloudfunctions.net/function'
-
     - name: 💎 Set Artifact
       id: artifact
       shell: bash
       run: |      
         shopt -s dotglob
         rm -rf ${{ inputs.action_path }}/.git
-
-        mv -f ${{ runner.temp }}/.env ${{ inputs.action_path }}/
-        mv -f ${{ runner.temp }}/_config.yml ${{ inputs.action_path }}/
- 
-        mkdir -p ${{ inputs.action_path }}/_data
-        mv -f ${{ runner.temp }}/*.json ${{ inputs.action_path }}/_data/
 
         mv -f ${{ inputs.action_path }} ${{ github.workspace }}/_site
         mkdir -p ${{ inputs.action_path }} && cp -R ${{ github.workspace }}/_site/. ${{ inputs.action_path }}/
@@ -160,14 +145,14 @@ runs:
         skipContainerUserIdUpdate: true
         imageName: ${{ inputs.image_name }}
         configFile: _site/.devcontainer.json
+        runCmd: bash user_data/ft_client/test_client/feed.sh
+        push: ${{ env.RERUN_RUNNER == 'true' && 'always' || 'never' }}
         env: |
           ID=${{ env.ID }}
           GH_TOKEN=${{ env.GH_TOKEN }}
           REMOTE_REPO=${{ env.REMOTE_REPO }}
           BEARER=${{ steps.auth.outputs.id_token }}
           TARGET_REPOSITORY=${{ env.TARGET_REPOSITORY }}
-        push: ${{ env.RERUN_RUNNER == 'true' && 'always' || 'never' }}
-        runCmd: bash user_data/ft_client/test_client/test_rest_client.sh
 
     - name: 🪂 Remove existing images
       id: variables
