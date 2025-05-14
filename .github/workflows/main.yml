@@ -45,10 +45,10 @@ jobs:
       - name: 📂 Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
           token: ${{ secrets.ACCESS_TOKEN }}
           repository: ${{ env.JOBS_ID != 1 && env.DOC || '' }}
-
+          submodules: ${{ env.JOBS_ID != 1 && 'recursive' || false }}
+          
       - name: ⚙️ Build Maps
         uses: eq19/maps@v8
         id: build-parser
