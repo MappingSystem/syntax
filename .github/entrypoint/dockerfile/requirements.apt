@@ -1,4 +1,5 @@
 apt-transport-https
+bc
 build-essential
 ca-certificates
 #clang
@@ -42,4 +43,5 @@ supervisor
 unzip
 wget
 yq
+xz-utils
 zlib1g-dev

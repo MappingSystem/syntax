@@ -9,12 +9,10 @@ on:
   repository_dispatch:
     types: [trigger_action, retry_workflow]
 
-# 🕸️ Allow concurrent
 concurrency:
-  group: "pages"
   cancel-in-progress: true
+  group: ${{ github.workflow }}
 
-# ⚠️ Set token permissions
 permissions: write-all
         
 # 🕸️ Global Environment
